@@ -23,7 +23,12 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Routes
+// Test route
+app.get('/test', (req, res) => {
+  res.json({ message: 'Server is running!' });
+});
+
+// Conversations route
 app.post('/api/conversations', async (req, res) => {
   try {
     await client.connect();
@@ -41,6 +46,7 @@ app.post('/api/conversations', async (req, res) => {
   }
 });
 
+// Leads route
 app.post('/api/leads', async (req, res) => {
   try {
     await client.connect();
@@ -68,6 +74,42 @@ app.post('/api/leads', async (req, res) => {
   }
 });
 
+// Get all conversations
+app.get('/api/conversations', async (req, res) => {
+  try {
+    await client.connect();
+    const database = client.db('chatbot');
+    const conversations = database.collection('conversations');
+    
+    const result = await conversations.find().toArray();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all leads
+app.get('/api/leads', async (req, res) => {
+  try {
+    await client.connect();
+    const database = client.db('chatbot');
+    const leads = database.collection('leads');
+    
+    const result = await leads.find().toArray();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something broke!' });
+});
+
+// Start the server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
+  console.log(`Test the server at http://localhost:${port}/test`);
 });
