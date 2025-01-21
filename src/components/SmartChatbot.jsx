@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, X, Send } from 'lucide-react';
 
-// Main component with default props for customization
+const API_URL = 'http://localhost:3001/api';
+
 const SmartChatbot = ({
   companyName = 'Your Company',
   primaryColor = '#2563eb',
   welcomeMessage = 'Hello! How can I help you today?'
 }) => {
-  // State management
-  const [isOpen, setIsOpen] = useState(false);          // Controls chat window visibility
-  const [messages, setMessages] = useState([]);         // Stores chat messages
-  const [userInput, setUserInput] = useState('');       // Current user input
-  const [customerEmail, setCustomerEmail] = useState(''); // Stores customer email
-  const [showEmailPrompt, setShowEmailPrompt] = useState(false); // Controls email form visibility
+  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [userInput, setUserInput] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [showEmailPrompt, setShowEmailPrompt] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Initialize chat with welcome message when opened
+  // Initialise chat with welcome message
   useEffect(() => {
     if (isOpen && messages.length === 0) {
       setMessages([
@@ -27,11 +28,55 @@ const SmartChatbot = ({
     }
   }, [isOpen, welcomeMessage]);
 
-  // Basic response logic - This will be enhanced later
+  // Save conversation to backend
+  const saveConversation = async (message) => {
+    try {
+      const response = await fetch(`${API_URL}/conversations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(message)
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to save conversation');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error saving conversation:', error);
+    }
+  };
+
+  // Save lead to backend
+  const saveLead = async (email, conversation) => {
+    try {
+      const response = await fetch(`${API_URL}/leads`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          conversation: JSON.stringify(conversation)
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to save lead');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error saving lead:', error);
+    }
+  };
+
+  // Get bot response
   const getAutomaticResponse = (input) => {
     const message = input.toLowerCase();
     
-    // Simple pattern matching for responses
     if (message.includes('pricing') || message.includes('cost')) {
       return "Our pricing starts at $49/month. Would you like more details?";
     }
@@ -45,65 +90,68 @@ const SmartChatbot = ({
     return "Thank you for your message. How can I assist you further?";
   };
 
-  // Handle sending messages
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!userInput.trim()) return;
 
-    // Create new message object
-    const newMessage = {
+    setIsLoading(true);
+    
+    // Create user message
+    const userMessage = {
       content: userInput,
       type: 'user',
       timestamp: new Date().toISOString()
     };
 
-    // Add user message to chat
-    setMessages(prev => [...prev, newMessage]);
-
-    // Clear input field
+    // Add to UI and save to backend
+    setMessages(prev => [...prev, userMessage]);
+    await saveConversation(userMessage);
     setUserInput('');
 
-    // Simulate bot response with delay
-    setTimeout(() => {
-      const response = getAutomaticResponse(userInput);
-      
-      setMessages(prev => [...prev, {
-        content: response,
+    // Get and handle bot response
+    setTimeout(async () => {
+      const botResponse = {
+        content: getAutomaticResponse(userMessage.content),
         type: 'bot',
         timestamp: new Date().toISOString()
-      }]);
+      };
 
-      // Check if we should ask for email
-      if (shouldCollectEmail(userInput)) {
+      setMessages(prev => [...prev, botResponse]);
+      await saveConversation(botResponse);
+
+      if (shouldCollectEmail(userMessage.content)) {
         setShowEmailPrompt(true);
       }
+
+      setIsLoading(false);
     }, 1000);
   };
 
-  // Check if we should collect email based on user input
   const shouldCollectEmail = (message) => {
     const triggerWords = ['contact', 'email', 'talk', 'call', 'more info'];
     return triggerWords.some(word => message.toLowerCase().includes(word));
   };
 
-  // Handle email form submission
-  const handleEmailSubmit = (e) => {
+  const handleEmailSubmit = async (e) => {
     e.preventDefault();
     if (customerEmail) {
+      setIsLoading(true);
+
+      // Save lead
+      await saveLead(customerEmail, messages);
+
       // Add confirmation message
-      setMessages(prev => [...prev, {
+      const confirmationMessage = {
         content: `Thanks! We'll contact you at ${customerEmail} soon.`,
         type: 'bot',
         timestamp: new Date().toISOString()
-      }]);
-      
-      // In a real implementation, you would:
-      // 1. Save to database
-      // 2. Send notification email
-      // 3. Integrate with CRM
-      console.log('Customer email collected:', customerEmail);
+      };
+
+      setMessages(prev => [...prev, confirmationMessage]);
+      await saveConversation(confirmationMessage);
       
       setShowEmailPrompt(false);
       setCustomerEmail('');
+      setIsLoading(false);
     }
   };
 
@@ -158,6 +206,13 @@ const SmartChatbot = ({
                 </div>
               </div>
             ))}
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="bg-gray-100 rounded-lg p-3 animate-pulse">
+                  Typing...
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Email Collection Form */}
@@ -175,6 +230,7 @@ const SmartChatbot = ({
                 type="submit"
                 className="w-full p-2 text-white rounded hover:opacity-90 transition-opacity"
                 style={{ backgroundColor: primaryColor }}
+                disabled={isLoading}
               >
                 Submit
               </button>
@@ -191,11 +247,13 @@ const SmartChatbot = ({
                 onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                 placeholder="Type your message..."
                 className="flex-1 p-2 border rounded"
+                disabled={isLoading}
               />
               <button
                 onClick={handleSendMessage}
                 className="p-2 text-white rounded hover:opacity-90 transition-opacity"
                 style={{ backgroundColor: primaryColor }}
+                disabled={isLoading}
               >
                 <Send className="h-5 w-5" />
               </button>
