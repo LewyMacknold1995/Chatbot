@@ -3,9 +3,20 @@ import SmartChatbot from './components/SmartChatbot'
 function App() {
   return (
     <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Your Website Content</h1>
-      <p>This is your main website content. The chatbot will appear in the bottom-right corner.</p>
+      <h1 className="text-2xl font-bold mb-4">Smart Support Demo</h1>
+      <p className="mb-4">This is a demo page showing the chatbot integration. The chatbot appears in the bottom-right corner.</p>
       
+      <div className="max-w-2xl">
+        <h2 className="text-xl font-bold mb-2">Features Demonstrated:</h2>
+        <ul className="list-disc pl-5 space-y-2">
+          <li>Real-time chat interface</li>
+          <li>Smart email collection</li>
+          <li>Automated responses</li>
+          <li>Backend integration</li>
+          <li>Conversation storage</li>
+        </ul>
+      </div>
+
       <SmartChatbot 
         companyName="Demo Company"
         primaryColor="#2563eb"
